@@ -28,8 +28,8 @@ app.add_middleware(
 
 db_config = {
     'host': 'srv1073.hstgr.io',
-    'database': 'u771906953_financas',
-    'user': 'u771906953_ailton',
+    'database': 'u771906953_barreto',
+    'user': 'u771906953_barreto',
     'password': 'MQPj3:6GY_hFfjA',
     'port': 3306
 }
@@ -61,9 +61,9 @@ def login(data: LoginRequest):
     try:
         conn = get_connection()
         query = """
-            SELECT id_user, conta, usuario, password, status, currency
-            FROM tb_users
-            WHERE usuario = %s;
+            SELECT id, nome, senha
+            FROM tb_pscineiro
+            WHERE nome = %s;
         """
         df = pd.read_sql(query, conn, params=[data.usuario])
 
@@ -75,17 +75,14 @@ def login(data: LoginRequest):
         if usuario_encontrado.empty:
             raise HTTPException(status_code=401, detail="Usuário ou senha inválidos.")
 
-        status = usuario_encontrado.iloc[0]["status"]
-        if status != 1:
-            raise HTTPException(status_code=403, detail="Usuário inativo. Contate o administrador.")
 
-        id_user = int(usuario_encontrado.iloc[0]['id_user'])
-        usuario = usuario_encontrado.iloc[0]['usuario']
-        conta = usuario_encontrado.iloc[0]["conta"]
-        currency = usuario_encontrado.iloc[0]["currency"]
+        id = int(usuario_encontrado.iloc[0]['id'])
+        nome = usuario_encontrado.iloc[0]['nome']
+        senha = usuario_encontrado.iloc[0]["senha"]
+
         
 
-        return {"success": True, "id_user": id_user, "usuario": usuario, "conta": conta, "currency": currency }
+        return {"success": True, "id": id, "nome": nome, "senha": senha }
 
     except HTTPException as he:
         raise he
@@ -302,34 +299,7 @@ def update_status(id: int, status_data: UpdateStatusRequest):
         if conn:
             conn.close()
             
-# ------------------------------------------------------------------------------------------
 
-
-class UpdateCurrencyRequest(BaseModel):
-    currency: str
-
-@app.put("/update-currency/{id}")
-def update_status(id: int, currency_data: UpdateCurrencyRequest):
-    conn = None
-    try:
-        conn = get_connection()
-        with conn.cursor() as cursor:
-    
-            query = "UPDATE tb_users SET currency = %s WHERE id_user = %s"
-            cursor.execute(query, (currency_data.currency, id))
-            conn.commit()
-
-            if cursor.rowcount == 0:
-                return {"success": False, "message": "Usuário não encontrado."}
-
-        return {"success": True, "message": "Moeda atualizada com sucesso."}
-    except Exception as e:
-        print("Erro ao atualizar Moeda:", e)
-        raise HTTPException(status_code=500, detail="Erro ao atualizar Moeda.")
-    finally:
-        if conn:
-            conn.close()
-            
 # ------------------------------------------------------------------------------------------
 
 
