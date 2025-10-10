@@ -62,7 +62,7 @@ def login(data: LoginRequest):
         conn = get_connection()
         query = """
             SELECT id, nome, senha
-            FROM tb_pscineiro
+            FROM tb_piscineiro
             WHERE nome = %s;
         """
         df = pd.read_sql(query, conn, params=[data.usuario])
@@ -70,7 +70,7 @@ def login(data: LoginRequest):
         if df.empty:
             raise HTTPException(status_code=401, detail="Usuário ou senha inválidos.")
 
-        usuario_encontrado = df[df["password"] == data.senha]
+        usuario_encontrado = df[df["senha"] == data.senha]
 
         if usuario_encontrado.empty:
             raise HTTPException(status_code=401, detail="Usuário ou senha inválidos.")
@@ -103,7 +103,7 @@ class Add_user(BaseModel):
     cpf: str
 
 
-@app.post("/add_user")
+@app.post("/add_piscineiro")
 def inserir_usuario(mov: Add_user):
     conn = None
     try:
@@ -127,7 +127,7 @@ def inserir_usuario(mov: Add_user):
 # ------------------------------------------------------------------------------------------
 
 
-@app.get("/mov/{id_user}")
+@app.get("/atendimentos/{id_user}")
 def get_movimentacao(id_user: int):
     conn = None
     try:
@@ -163,53 +163,34 @@ def get_movimentacao(id_user: int):
 
 # ------------------------------------------------------------------------------------------
 
-
-@app.get("/descricao/{id_user}")
-def get_movimentacao(id_user: int):
+@app.get("/cliente/{id_piscineiro}")
+def get_clientes(id_piscineiro: int):
     conn = None
     try:
         conn = get_connection()
-        
+
         query = """
-                SELECT 
-                    categoria,
-                    fornecedor,
-                    id_user,
-                    id_desc,
-                    tipo
-                FROM 
-                    u771906953_financas.tb_descricao
-                WHERE 
-                    id_user = %s;
-                """
+            SELECT 
+                id,
+                nome,
+                `cnpj/cpf`,
+                id_piscineiro
+            FROM 
+                tb_cliente
+            WHERE 
+                id_piscineiro = %s;
+        """
 
-        df = pd.read_sql(query, conn, params=[id_user])
+        df = pd.read_sql(query, conn, params=[id_piscineiro])
+        return df.to_dict(orient="records")
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Erro ao acessar o banco de dados.")
-    finally:
-        if conn:
-            conn.close()
-    return df.to_dict(orient="records")
-
-# ------------------------------------------------------------------------------------------
-
-@app.get("/users/{id_user}")
-def get_user(id_user: int):
-    conn = None
-    try:
-        conn = get_connection()
-        query = "SELECT * FROM u771906953_financas.tb_users WHERE id_user = %s;"
-        df = pd.read_sql(query, conn, params=[id_user])
-    except Exception as e:
+        print("Erro:", e)
         raise HTTPException(status_code=500, detail="Erro ao acessar o banco de dados.")
     finally:
         if conn:
             conn.close()
 
-    if df.empty:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-
-    return df.to_dict(orient="records")[0]
 
 # ------------------------------------------------------------------------------------------
 class Movimentacao(BaseModel):
@@ -223,14 +204,14 @@ class Movimentacao(BaseModel):
 
 # ------------------------------------------------------------------------------------------
 
-@app.post("/add")
+@app.post("/add_atendimento")
 def inserir_movimentacao(mov: Movimentacao):
     conn = None
     try:
         conn = get_connection()
         with conn.cursor() as cursor:
             query = """
-                INSERT INTO tb_mov (data, categoria, descricao, tipo, status, valor, id_user)
+                INSERT INTO tb_mov (data, categoria, id_piscineiro)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(query, (mov.data, mov.categoria, mov.fornecedor, mov.tipo, mov.status, mov.valor, mov.id_user))
