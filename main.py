@@ -110,15 +110,15 @@ def inserir_usuario(mov: Add_user):
         conn = get_connection()
         with conn.cursor() as cursor:
             query = """
-                INSERT INTO tb_users (usuario, password, email, status, cpf, conta, data_cad, currency)
+                INSERT INTO tb_piscineiro (usuario, password, email, status, cpf, data_cad)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(query, (mov.usuario, mov.password, mov.email, 1, mov.cpf, "Free", date.today(), "BRL")) 
+            cursor.execute(query, (mov.usuario, mov.password, mov.email, 1, mov.cpf, date.today()) )
             conn.commit()
-        return {"success": True, "message": "Usuário inserido com sucesso"}
+        return {"success": True, "message": "Piscineiro cadastrado com sucesso"}
     except Exception as e:
         print("Erro:", e)
-        raise HTTPException(status_code=500, detail="Erro ao inserir Usuário")
+        raise HTTPException(status_code=500, detail="Erro ao inserir Piscineiro")
     finally:
         if conn:
             conn.close()
@@ -329,42 +329,7 @@ def delete_categoria(id: int):
             conn.close()
 
 # --------------------------------------------------------------------------------------------
-# Login
 
-class LoginRequest(BaseModel):
-    usuario: str
-    senha: str
-
-@app.post("/login_barreto")
-def login(data: LoginRequest):
-    planilha_url = os.getenv("PLANILHA_URL")
-    if not planilha_url:
-        raise HTTPException(status_code=500, detail="PLANILHA_URL não configurada")
-
-    try:
-        response = requests.get(planilha_url)
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Falha ao baixar a planilha")
-
-        csv_text = response.text
-        usuarios = list(csv.DictReader(io.StringIO(csv_text)))
-
-        # Busca usuário e senha no CSV
-        user = next((u for u in usuarios if u.get("user") == data.usuario and u.get("password") == data.senha), None)
-
-        if user:
-            user_copy = user.copy()
-            user_copy.pop("password", None)  # remove senha do retorno
-            return {
-                "success": True,
-                "user": user_copy
-            }
-        else:
-            return {"success": False, "message": "Usuário ou senha inválidos"}
-
-    except Exception as e:
-        print(f"Erro no login: {e}")
-        return {"success": False, "message": "Erro ao processar login"}
 
 # --------------------------------------------------------------------------------------------
 
