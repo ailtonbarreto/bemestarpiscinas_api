@@ -97,10 +97,9 @@ def login(data: LoginRequest):
 # ------------------------------------------------------------------------------------------
 
 class Add_user(BaseModel):
-    usuario: str
-    password: str
-    email: str
-    cpf: str
+    nome: str
+    senha: str
+    foto: str
 
 
 @app.post("/add_piscineiro")
@@ -110,10 +109,10 @@ def inserir_usuario(mov: Add_user):
         conn = get_connection()
         with conn.cursor() as cursor:
             query = """
-                INSERT INTO tb_piscineiro (usuario, password, email, status, cpf, data_cad)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO tb_piscineiro (nome, senha, foto)
+                VALUES (%s, %s, %s)
             """
-            cursor.execute(query, (mov.usuario, mov.password, mov.email, 1, mov.cpf, date.today()) )
+            cursor.execute(query, (mov.nome, mov.senha, mov.foto ))
             conn.commit()
         return {"success": True, "message": "Piscineiro cadastrado com sucesso"}
     except Exception as e:
@@ -137,8 +136,6 @@ def get_movimentacao(id_user: int):
                 SELECT 
                     id,
                     data,
-                    descricao,
-                    categoria,
                     tipo,
                     status,
                     valor,
