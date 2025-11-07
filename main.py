@@ -160,6 +160,7 @@ def get_movimentacao(id_user: int):
 
 # ------------------------------------------------------------------------------------------
 
+# ok
 @app.get("/cliente/{id_piscineiro}")
 def get_clientes(id_piscineiro: int):
     conn = None
