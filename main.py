@@ -185,8 +185,8 @@ async def update_foto(
             conn.close()    
 
 
+# -------------------------------------------------------------------
 
-import base64
 
 @app.get("/piscineiro/{id}")
 def get_piscineiro(id: int):
@@ -226,43 +226,6 @@ def get_piscineiro(id: int):
         if conn:
             conn.close()
 
-
-# ------------------------------------------------------------------------------------------
-
-
-
-@app.get("/atendimentos/{id_user}")
-def get_movimentacao(id_user: int):
-    conn = None
-    try:
-        conn = get_connection()
-        
-        query = """
-                SELECT 
-                    id,
-                    data,
-                    descricao,
-                    categoria,
-                    tipo,
-                    status,
-                    valor,
-                    id_user,
-                    EXTRACT(DAY FROM data) AS dia,
-                    EXTRACT(MONTH FROM data) AS mes,
-                    EXTRACT(YEAR FROM data) AS ano
-                FROM 
-                    u771906953_financas.tb_mov
-                WHERE 
-                    id_user = %s;
-                """
-
-        df = pd.read_sql(query, conn, params=[id_user])
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Erro ao acessar o banco de dados.")
-    finally:
-        if conn:
-            conn.close()
-    return df.to_dict(orient="records")
 
 
 # ------------------------------------------------------------------------------------------
@@ -328,87 +291,42 @@ def inserir_movimentacao(mov: Movimentacao):
         if conn:
             conn.close()
 
-# ------------------------------------------------------------------------------------------
-
-class UpdateStatusRequest(BaseModel):
-    status: str
-
-@app.put("/update-status/{id}")
-def update_status(id: int, status_data: UpdateStatusRequest):
-    conn = None
-    try:
-        conn = get_connection()
-        with conn.cursor() as cursor:
-    
-            query = "UPDATE tb_mov SET status = %s WHERE id = %s"
-            cursor.execute(query, (status_data.status, id))
-            conn.commit()
-
-            if cursor.rowcount == 0:
-                return {"success": False, "message": "Movimentação não encontrada."}
-
-        return {"success": True, "message": "Status atualizado com sucesso."}
-    except Exception as e:
-        print("Erro ao atualizar status:", e)
-        raise HTTPException(status_code=500, detail="Erro ao atualizar status.")
-    finally:
-        if conn:
-            conn.close()
-            
 
 # ------------------------------------------------------------------------------------------
 
-
-@app.delete("/delete-mov/{id}")
-def delete_movimentacao(id: int):
+@app.get("/atendimentos")
+def get_atendimentos(piscineiro: int, data: str = None):
     conn = None
     try:
         conn = get_connection()
-        with conn.cursor() as cursor:
-            query = "DELETE FROM tb_mov WHERE id = %s"
-            cursor.execute(query, (id,))
-            conn.commit()
 
-            if cursor.rowcount == 0:
-                return {"success": False, "message": "Movimentação não encontrada."}
+        query = """
+            SELECT 
+                id,
+                cliente,
+                DATE(data) AS data
+            FROM tb_atendimentos
+            WHERE piscineiro = %s
+        """
 
-        return {"success": True, "message": "Movimentação deletada com sucesso."}
+        params = [piscineiro]
+
+        if data:
+            query += " AND DATE(data) = %s"
+            params.append(data)
+
+        df = pd.read_sql(query, conn, params=params)
+
+        return df.to_dict(orient="records")
+
     except Exception as e:
-        print("Erro ao deletar movimentação:", e)
-        raise HTTPException(status_code=500, detail="Erro ao deletar movimentação.")
+        print("Erro ao carregar atendimentos:", e)
+        raise HTTPException(status_code=500, detail="Erro ao buscar atendimentos.")
     finally:
         if conn:
             conn.close()
 
-# ------------------------------------------------------------------------------------------
 
-@app.delete("/delete_descricao/{id}")
-def delete_categoria(id: int):
-    conn = None
-    try:
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            query = "DELETE FROM tb_descricao WHERE id_desc = %s"
-            cursor.execute(query, (id,))
-            conn.commit()
-
-            if cursor.rowcount == 0:
-                return {"success": False, "message": "Categoria não encontrada."}
-
-        return {"success": True, "message": "Categoria deletada com sucesso."}
-    except Exception as e:
-        print("Erro ao deletar categoria:", e)
-        raise HTTPException(status_code=500, detail="Erro ao deletar categoria.")
-    finally:
-        if conn:
-            conn.close()
-
-# --------------------------------------------------------------------------------------------
-
-
-# --------------------------------------------------------------------------------------------
-
-    
 # uvicorn main:app --reload
 
 # uvicorn main:app --host 0.0.0.0 --port 10000
