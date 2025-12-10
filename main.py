@@ -115,12 +115,12 @@ def inserir_usuario(mov: Add_user):
                 INSERT INTO tb_piscineiro (nome, senha, foto)
                 VALUES (%s, %s, %s)
             """
-            cursor.execute(query, (mov.nome, mov.senha, mov.foto)) 
+            cursor.execute(query, (mov.usuario, mov.password, mov.email, 1, mov.cpf, "Free", date.today(), "BRL")) 
             conn.commit()
-        return {"success": True, "message": "Piscineiro inserido com sucesso"}
+        return {"success": True, "message": "Usuário inserido com sucesso"}
     except Exception as e:
         print("Erro:", e)
-        raise HTTPException(status_code=500, detail="Erro ao inserir Usuário")
+        raise HTTPException(status_code=500, detail="Erro ao inserir Piscineiro")
     finally:
         if conn:
             conn.close()
@@ -241,8 +241,6 @@ def get_movimentacao(id_user: int):
                 SELECT 
                     id,
                     data,
-                    descricao,
-                    categoria,
                     tipo,
                     status,
                     valor,
@@ -267,6 +265,7 @@ def get_movimentacao(id_user: int):
 
 # ------------------------------------------------------------------------------------------
 
+# ok
 @app.get("/cliente/{id_piscineiro}")
 def get_clientes(id_piscineiro: int):
     conn = None
