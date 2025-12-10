@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException
 import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import File, Form, UploadFile
 from pydantic import BaseModel
 import pymysql
 from datetime import date
+import base64
 import uvicorn
 
 import requests, csv, io, os
@@ -95,12 +97,12 @@ def login(data: LoginRequest):
 
 
 # ------------------------------------------------------------------------------------------
+# Add Piscineiro
 
 class Add_user(BaseModel):
-    usuario: str
-    password: str
-    email: str
-    cpf: str
+    nome: str
+    senha: str
+    foto: str
 
 
 @app.post("/add_piscineiro")
@@ -110,12 +112,12 @@ def inserir_usuario(mov: Add_user):
         conn = get_connection()
         with conn.cursor() as cursor:
             query = """
-                INSERT INTO tb_users (usuario, password, email, status, cpf, conta, data_cad, currency)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO tb_piscineiro (nome, senha, foto)
+                VALUES (%s, %s, %s)
             """
-            cursor.execute(query, (mov.usuario, mov.password, mov.email, 1, mov.cpf, "Free", date.today(), "BRL")) 
+            cursor.execute(query, (mov.nome, mov.senha, mov.foto)) 
             conn.commit()
-        return {"success": True, "message": "Usuário inserido com sucesso"}
+        return {"success": True, "message": "Piscineiro inserido com sucesso"}
     except Exception as e:
         print("Erro:", e)
         raise HTTPException(status_code=500, detail="Erro ao inserir Usuário")
@@ -125,6 +127,108 @@ def inserir_usuario(mov: Add_user):
 
 
 # ------------------------------------------------------------------------------------------
+
+class UpdateSenha(BaseModel):
+    id: int
+    senha: str
+
+
+@app.post("/update_senha")
+def update_senha(data: UpdateSenha):
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+
+            query = "UPDATE tb_piscineiro SET senha = %s WHERE id = %s"
+            cursor.execute(query, (data.senha, data.id))
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Piscineiro não encontrado")
+
+        return {"success": True, "message": "Senha atualizada com sucesso"}
+
+    except Exception as e:
+        print("Erro:", e)
+        raise HTTPException(status_code=500, detail="Erro ao atualizar senha")
+
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/update_foto")
+async def update_foto(
+    id: int = Form(...),
+    foto: UploadFile = File(...)
+):
+    conn = None
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+
+            # Lê o conteúdo binário da imagem
+            conteudo_foto = await foto.read()
+
+            query = "UPDATE tb_piscineiro SET foto = %s WHERE id = %s"
+            cursor.execute(query, (conteudo_foto, id))
+            conn.commit()
+
+        return {"success": True, "message": "Foto atualizada com sucesso"}
+
+    except Exception as e:
+        print("Erro:", e)
+        raise HTTPException(status_code=500, detail="Erro ao atualizar a foto")
+
+    finally:
+        if conn:
+            conn.close()    
+
+
+
+import base64
+
+@app.get("/piscineiro/{id}")
+def get_piscineiro(id: int):
+    conn = None
+    try:
+        conn = get_connection()
+
+        query = """
+            SELECT id, nome, senha, foto
+            FROM tb_piscineiro
+            WHERE id = %s;
+        """
+
+        df = pd.read_sql(query, conn, params=[id])
+
+        if df.empty:
+            raise HTTPException(status_code=404, detail="Piscineiro não encontrado")
+
+        foto_bin = df.iloc[0]["foto"]
+
+        if foto_bin:
+            foto_base64 = base64.b64encode(foto_bin).decode("utf-8")
+        else:
+            foto_base64 = None
+
+        return {
+            "id": int(df.iloc[0]["id"]),
+            "nome": str(df.iloc[0]["nome"]),
+            "senha": str(df.iloc[0]["senha"]),
+            "foto": foto_base64
+        }
+
+    except Exception as e:
+        print("Erro ao carregar piscineiro:", e)
+        raise HTTPException(status_code=500, detail="Erro ao buscar informações do piscineiro.")
+    finally:
+        if conn:
+            conn.close()
+
+
+# ------------------------------------------------------------------------------------------
+
 
 
 @app.get("/atendimentos/{id_user}")
@@ -226,35 +330,6 @@ def inserir_movimentacao(mov: Movimentacao):
 
 # ------------------------------------------------------------------------------------------
 
-
-class Categoria(BaseModel):
-    categoria: str
-    tipo: str
-    id_user: int
-
-@app.post("/add_descricao")
-def inserir_categoria(cat: Categoria):
-    conn = None
-    try:
-        conn = get_connection()
-        with conn.cursor() as cursor:
-            query = """
-                INSERT INTO tb_descricao (categoria, tipo, id_user)
-                VALUES (%s, %s, %s)
-            """
-            cursor.execute(query, (cat.categoria, cat.tipo, cat.id_user))
-            conn.commit()
-        return {"success": True, "message": "Categoria inserida com sucesso"}
-    except Exception as e:
-        print("Erro ao inserir categoria:", e)
-        raise HTTPException(status_code=500, detail="Erro ao inserir categoria")
-    finally:
-        if conn:
-            conn.close()
- 
-# ------------------------------------------------------------------------------------------
-
-
 class UpdateStatusRequest(BaseModel):
     status: str
 
@@ -329,42 +404,7 @@ def delete_categoria(id: int):
             conn.close()
 
 # --------------------------------------------------------------------------------------------
-# Login
 
-class LoginRequest(BaseModel):
-    usuario: str
-    senha: str
-
-@app.post("/login_barreto")
-def login(data: LoginRequest):
-    planilha_url = os.getenv("PLANILHA_URL")
-    if not planilha_url:
-        raise HTTPException(status_code=500, detail="PLANILHA_URL não configurada")
-
-    try:
-        response = requests.get(planilha_url)
-        if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Falha ao baixar a planilha")
-
-        csv_text = response.text
-        usuarios = list(csv.DictReader(io.StringIO(csv_text)))
-
-        # Busca usuário e senha no CSV
-        user = next((u for u in usuarios if u.get("user") == data.usuario and u.get("password") == data.senha), None)
-
-        if user:
-            user_copy = user.copy()
-            user_copy.pop("password", None)  # remove senha do retorno
-            return {
-                "success": True,
-                "user": user_copy
-            }
-        else:
-            return {"success": False, "message": "Usuário ou senha inválidos"}
-
-    except Exception as e:
-        print(f"Erro no login: {e}")
-        return {"success": False, "message": "Erro ao processar login"}
 
 # --------------------------------------------------------------------------------------------
 
