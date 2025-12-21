@@ -2,6 +2,6 @@ fastapi
 uvicorn
 pandas
 pymysql
+pydantic
 requests
 python-dotenv
-base64
