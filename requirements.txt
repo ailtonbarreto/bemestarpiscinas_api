@@ -4,3 +4,4 @@ pandas
 pymysql
 requests
 python-dotenv
+base64
