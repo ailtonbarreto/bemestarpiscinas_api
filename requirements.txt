@@ -4,3 +4,4 @@ pandas
 pymysql
 python-dotenv
 python-multipart
+requests
