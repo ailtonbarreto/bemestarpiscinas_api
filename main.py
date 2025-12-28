@@ -62,11 +62,13 @@ def login(data: LoginRequest):
     conn = None
     try:
         conn = get_connection()
+
         query = """
-            SELECT id, nome, senha
-            FROM tb_piscineiro
+            SELECT id, nome, senha, foto
+            FROM tb_pessoas
             WHERE nome = %s;
         """
+
         df = pd.read_sql(query, conn, params=[data.usuario])
 
         if df.empty:
@@ -77,17 +79,24 @@ def login(data: LoginRequest):
         if usuario_encontrado.empty:
             raise HTTPException(status_code=401, detail="Usuário ou senha inválidos.")
 
+        id = int(usuario_encontrado.iloc[0]["id"])
+        nome = usuario_encontrado.iloc[0]["nome"]
+        foto_blob = usuario_encontrado.iloc[0]["foto"]
 
-        id = int(usuario_encontrado.iloc[0]['id'])
-        nome = usuario_encontrado.iloc[0]['nome']
-        senha = usuario_encontrado.iloc[0]["senha"]
+        # BLOB -> Base64
+        foto_base64 = None
+        if foto_blob:
+            foto_base64 = base64.b64encode(foto_blob).decode("utf-8")
 
-        
+        return {
+            "success": True,
+            "id": id,
+            "nome": nome,
+            "foto": foto_base64
+        }
 
-        return {"success": True, "id": id, "nome": nome, "senha": senha }
-
-    except HTTPException as he:
-        raise he
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Erro inesperado no login: {e}")
         raise HTTPException(status_code=500, detail="Erro interno no servidor.")
@@ -112,7 +121,7 @@ def inserir_usuario(mov: Add_user):
         conn = get_connection()
         with conn.cursor() as cursor:
             query = """
-                INSERT INTO tb_piscineiro (nome, senha, foto)
+                INSERT INTO tb_pessoas (nome, senha, foto)
                 VALUES (%s, %s, %s)
             """
             cursor.execute(query, (mov.nome, mov.senha, mov.foto)) 
@@ -140,7 +149,7 @@ def update_senha(data: UpdateSenha):
         conn = get_connection()
         with conn.cursor() as cursor:
 
-            query = "UPDATE tb_piscineiro SET senha = %s WHERE id = %s"
+            query = "UPDATE tb_pessoas SET senha = %s WHERE id = %s"
             cursor.execute(query, (data.senha, data.id))
             conn.commit()
 
@@ -170,7 +179,7 @@ async def update_foto(
             # Lê o conteúdo binário da imagem
             conteudo_foto = await foto.read()
 
-            query = "UPDATE tb_piscineiro SET foto = %s WHERE id = %s"
+            query = "UPDATE tb_pessoas SET foto = %s WHERE id = %s"
             cursor.execute(query, (conteudo_foto, id))
             conn.commit()
 
@@ -196,7 +205,7 @@ def get_piscineiro(id: int):
 
         query = """
             SELECT id, nome, senha, foto
-            FROM tb_piscineiro
+            FROM tb_pessoas
             WHERE id = %s;
         """
 
@@ -294,11 +303,47 @@ def inserir_movimentacao(mov: Movimentacao):
 
 # ------------------------------------------------------------------------------------------
 
+# @app.get("/atendimentos")
+# def get_atendimentos(piscineiro: int, data: str = None):
+#     conn = None
+#     try:
+#         conn = get_connection()
+
+#         query = """
+#             SELECT 
+#                 id,
+#                 cliente,
+#                 DATE(data) AS data
+#             FROM tb_atendimentos
+#             WHERE piscineiro = %s
+#         """
+
+#         params = [piscineiro]
+
+#         if data:
+#             query += " AND DATE(data) = %s"
+#             params.append(data)
+
+#         df = pd.read_sql(query, conn, params=params)
+
+#         return df.to_dict(orient="records")
+
+#     except Exception as e:
+#         print("Erro ao carregar atendimentos:", e)
+#         raise HTTPException(status_code=500, detail="Erro ao buscar atendimentos.")
+#     finally:
+#         if conn:
+#             conn.close()
+
+
 @app.get("/atendimentos")
 def get_atendimentos(piscineiro: int, data: str = None):
     conn = None
     try:
         conn = get_connection()
+
+        if not data:
+            data = date.today().isoformat()
 
         query = """
             SELECT 
@@ -307,16 +352,13 @@ def get_atendimentos(piscineiro: int, data: str = None):
                 DATE(data) AS data
             FROM tb_atendimentos
             WHERE piscineiro = %s
+              AND DATE(data) = %s
+            ORDER BY data
         """
 
-        params = [piscineiro]
-
-        if data:
-            query += " AND DATE(data) = %s"
-            params.append(data)
+        params = [piscineiro, data]
 
         df = pd.read_sql(query, conn, params=params)
-
         return df.to_dict(orient="records")
 
     except Exception as e:
@@ -325,6 +367,7 @@ def get_atendimentos(piscineiro: int, data: str = None):
     finally:
         if conn:
             conn.close()
+
 
 
 # uvicorn main:app --reload
